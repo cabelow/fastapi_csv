@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Comparação BTP x AYZ</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h2 { margin-top: 40px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 6px; }
+        th { background: #f0f0f0; }
+        .ok { color: green; }
+        .erro { color: red; }
+    </style>
+</head>
+<body>
+
+<h1>Integração BTP × AYZ</h1>
+
+<h2>📊 Resumo</h2>
+<ul>
+    <li>Total BTP: {{ resultado.resumo.total_btp }}</li>
+    <li>Total AYZ: {{ resultado.resumo.total_ayz }}</li>
+    <li class="ok">Matches: {{ resultado.resumo.matches }}</li>
+    <li class="erro">Divergências: {{ resultado.resumo.divergencias }}</li>
+    <li class="erro">Não encontrados: {{ resultado.resumo.nao_encontrados }}</li>
+</ul>
+
+<h2>✅ Matches</h2>
+<table>
+    <tr>
+        <th>CPF</th>
+        <th>BTP ID</th>
+        <th>AYZ ID</th>
+    </tr>
+    {% for item in resultado.matches %}
+    <tr>
+        <td>{{ item.cpf }}</td>
+        <td>{{ item.btp_id }}</td>
+        <td>{{ item.ayz_id }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<h2>⚠️ Divergências</h2>
+{% for item in resultado.divergencias %}
+    <h3>CPF {{ item.cpf }}</h3>
+    <table>
+        <tr>
+            <th>Campo</th>
+            <th>BTP</th>
+            <th>AYZ</th>
+        </tr>
+        {% for campo, valores in item.divergencias.items() %}
+        <tr>
+            <td>{{ campo }}</td>
+            <td>{{ valores.btp }}</td>
+            <td>{{ valores.ayz }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+{% endfor %}
+
+<h2>❌ Não encontrados no AYZ</h2>
+<table>
+    <tr>
+        <th>CPF</th>
+        <th>BTP ID</th>
+    </tr>
+    {% for item in resultado.nao_encontrados %}
+    <tr>
+        <td>{{ item.cpf }}</td>
+        <td>{{ item.btp_id }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>

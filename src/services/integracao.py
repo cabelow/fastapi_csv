@@ -25,7 +25,8 @@ def comparar_funcionarios(df_btp, df_ayz):
     resultado = {
         "matches": [],
         "divergencias": [],
-        "nao_encontrados": []
+        "nao_encontrados": [],
+        "resumo": {}
     }
 
     for _, btp_row in df_btp.iterrows():
@@ -60,5 +61,13 @@ def comparar_funcionarios(df_btp, df_ayz):
                 "btp_id": btp_row.get("employee_id"),
                 "ayz_id": ayz_row.get("cod_func")
             })
+
+    resultado["resumo"] = {
+        "total_btp": len(df_btp),
+        "total_ayz": len(df_ayz),
+        "matches": len(resultado["matches"]),
+        "divergencias": len(resultado["divergencias"]),
+        "nao_encontrados": len(resultado["nao_encontrados"]),
+    }
 
     return resultado
