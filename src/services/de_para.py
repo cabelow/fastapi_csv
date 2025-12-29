@@ -40,6 +40,19 @@ DE_PARA_POSITION_CODE = {
     "p107": "cg107",
 }
 
+DE_PARA_UNIT_CODE = {
+    "u001": "un01",
+    "u002": "un02",
+    "u003": "un03",
+    "u004": "un04",
+    "u005": "un05",
+    "u006": "un06",
+    "u007": "un07",
+    "u008": "un08",
+    "u009": "un09",
+    "u010": "un10",
+}
+
 # DE–PARA de nomes/cidades (referência + IA)
 DE_PARA_DEPARTMENT_NAME = {
     "tecnologia da informacao": ["ti", "tec info", "tecnologia informação", "tech info", "informática"],

@@ -1,3 +1,13 @@
+{% macro status_badge(status) %}
+    {% if status.startswith('aprovado') or status == 'exato' %}
+        <span class="ok">{{ status }}</span>
+    {% elif status.startswith('reprovado') %}
+        <span class="erro">{{ status }}</span>
+    {% else %}
+        <span class="warn">{{ status }}</span>
+    {% endif %}
+{% endmacro %}
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -63,7 +73,6 @@
 </table>
 
 <h2>🧠 Matches semânticos (IA)</h2>
-
 {% for item in resultado.matches_semanticos %}
     <div class="cpf-header">
         CPF {{ item.cpf }} | BTP: {{ item.btp_id }} | AYZ: {{ item.ayz_id }}
@@ -79,13 +88,11 @@
         </tr>
 
         {% for campo, valores in item.divergencias.items() %}
-        <tr class="status-aceito">
+        <tr class="{% if valores.status.startswith('aprovado') or valores.status == 'exato' %}status-aceito{% else %}status-divergente{% endif %}">
             <td>{{ campo }}</td>
             <td>{{ valores.btp }}</td>
             <td>{{ valores.ayz }}</td>
-            <td>
-                <span class="ok">Aceito semanticamente</span>
-            </td>
+            <td>{{ status_badge(valores.status) }}</td>
             <td>{{ "%.3f"|format(valores.score) }}</td>
         </tr>
         {% endfor %}
@@ -94,9 +101,7 @@
     <p>Nenhum match semântico encontrado.</p>
 {% endfor %}
 
-
 <h2>⚠️ Divergências reais</h2>
-
 {% for item in resultado.divergencias_reais %}
     <div class="cpf-header">
         CPF {{ item.cpf }} | BTP: {{ item.btp_id }} | AYZ: {{ item.ayz_id }}
@@ -112,17 +117,11 @@
         </tr>
 
         {% for campo, valores in item.divergencias.items() %}
-        <tr class="{% if valores.status == 'aceito_semanticamente' %}status-aceito{% else %}status-divergente{% endif %}">
+        <tr class="{% if valores.status.startswith('aprovado') or valores.status == 'exato' %}status-aceito{% else %}status-divergente{% endif %}">
             <td>{{ campo }}</td>
             <td>{{ valores.btp }}</td>
             <td>{{ valores.ayz }}</td>
-            <td>
-                {% if valores.status == 'aceito_semanticamente' %}
-                    <span class="ok">Aceito semanticamente</span>
-                {% else %}
-                    <span class="erro">Divergente</span>
-                {% endif %}
-            </td>
+            <td>{{ status_badge(valores.status) }}</td>
             <td>{{ "%.3f"|format(valores.score) }}</td>
         </tr>
         {% endfor %}

@@ -1,14 +1,7 @@
-# services/integracao.py
-
-from utils.normalizacao import normalizar_cpf, normalizar_texto
+import pandas as pd
+from services.de_para import DE_PARA_UNIT_CODE, match_com_referencia, validar_de_para, DE_PARA_DEPARTMENT_CODE, DE_PARA_POSITION_CODE, DE_PARA_DEPARTMENT_NAME
 from services.semantic_matcher import similaridade_semantica
-from services.de_para import (
-    DE_PARA_DEPARTMENT_CODE,
-    DE_PARA_POSITION_CODE,
-    DE_PARA_DEPARTMENT_NAME,
-    match_com_referencia,
-    validar_de_para,
-)
+from utils.normalizacao import normalizar_cpf, normalizar_texto
 
 # Thresholds
 THRESHOLD_SEMANTICO = 0.85
@@ -17,6 +10,7 @@ THRESHOLD_FULLNAME_DEFAULT = 0.5
 CAMPOS_DE_PARA = {
     "department_code": DE_PARA_DEPARTMENT_CODE,
     "position_code": DE_PARA_POSITION_CODE,
+    "unit_code": DE_PARA_UNIT_CODE,
 }
 
 CAMPOS_COMPARACAO = [
@@ -29,50 +23,44 @@ CAMPOS_COMPARACAO = [
     ("position_name", "cargo"),
 ]
 
-# ============================================================
-# Comparação de um campo
-# ============================================================
 def comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname=THRESHOLD_FULLNAME_DEFAULT):
     """
     Retorna dict com:
     {
-        "status": aceito | divergente | match_semantico | match_de_para | exato,
+        "status": "exato" | "aprovado por IA" | "reprovado por IA" | "aprovado com IA" | "reprovado com IA" | "aprovado regra de_para" | "reprovado regra de_para",
         "score": float,
-        "regra": regra utilizada
+        "regra": regra utilizada,
+        "aceito": bool
     }
     """
-
     valor_btp_norm = normalizar_texto(valor_btp)
     valor_ayz_norm = normalizar_texto(valor_ayz)
 
+    # EXATO
     if valor_btp_norm == valor_ayz_norm:
-        return {"status": "exato", "score": 1.0, "regra": "exato"}
+        return {"status": "exato", "score": 1.0, "regra": "exato", "aceito": True}
 
-    # DE–PARA para códigos (binário)
+    # DE–PARA para códigos
     if campo_btp in CAMPOS_DE_PARA:
         aceito = validar_de_para(valor_btp_norm, valor_ayz_norm, CAMPOS_DE_PARA[campo_btp])
-        score = 1.0 if aceito else 0.0
-        status = "aceito" if aceito else "divergente"
-        return {"status": status, "score": score, "regra": "de_para"}
+        status = "aprovado regra DE-PARA" if aceito else "reprovado regra DE-PARA"
+        return {"status": status, "score": 1.0 if aceito else 0.0, "regra": "de_para", "aceito": aceito}
 
     # department_name e unit_name → DE–PARA + IA
-    elif campo_btp in ["department_name", "unit_name"]:
+    elif campo_btp in ["department_name", "unit_name", "position_name"]:
         resultado = match_com_referencia(valor_btp_norm, valor_ayz_norm, DE_PARA_DEPARTMENT_NAME, THRESHOLD_SEMANTICO)
         aceito = resultado["status"] != "divergente"
-        score = resultado["score"]
-        status = "aceito" if aceito else "divergente"
-        return {"status": status, "score": score, "regra": resultado["status"]}
+        status = "aprovado DE-PARA com IA" if aceito else "reprovado DE-PARA com IA"
+        return {"status": status, "score": resultado["score"], "regra": resultado["status"], "aceito": aceito}
 
     # full_name → IA apenas
     else:
         score = similaridade_semantica(valor_btp_norm, valor_ayz_norm)
         aceito = score >= threshold_fullname
-        status = "aceito" if aceito else "divergente"
-        return {"status": status, "score": score, "regra": "semantica"}
+        status = "aprovado por IA" if aceito else "reprovado por IA"
+        return {"status": status, "score": score, "regra": "semantica", "aceito": aceito}
 
-# ============================================================
-# Processa um funcionário
-# ============================================================
+
 def processar_funcionario(btp_row, df_ayz, threshold_fullname=THRESHOLD_FULLNAME_DEFAULT):
     cpf = btp_row["document_number"]
     ayz_match = df_ayz[df_ayz["cpf"] == cpf]
@@ -97,7 +85,7 @@ def processar_funcionario(btp_row, df_ayz, threshold_fullname=THRESHOLD_FULLNAME
             "regra": resultado["regra"],
         }
 
-        if resultado["status"] != "aceito":
+        if not resultado["aceito"]:
             possui_divergencia_real = True
 
     registro_base = {
@@ -113,9 +101,7 @@ def processar_funcionario(btp_row, df_ayz, threshold_fullname=THRESHOLD_FULLNAME
         "possui_divergencia_real": possui_divergencia_real,
     }
 
-# ============================================================
-# Comparar todos os funcionários
-# ============================================================
+
 def comparar_funcionarios(df_btp, df_ayz, threshold_fullname=THRESHOLD_FULLNAME_DEFAULT):
     resultado = {
         "matches_exatos": [],
