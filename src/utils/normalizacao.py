@@ -38,3 +38,14 @@ def normalizar_cpf(cpf):
     if len(cpf) != 11:
         return cpf
     return cpf
+
+
+
+def normalizar_dataframes(df_btp, df_ayz):
+    df_btp["document_number"] = df_btp["document_number"].apply(normalizar_cpf)
+    df_btp["full_name"] = df_btp["full_name"].apply(normalizar_texto)
+
+    df_ayz["cpf"] = df_ayz["cpf"].apply(normalizar_cpf)
+    df_ayz["nome_funcionario"] = df_ayz["nome_funcionario"].apply(normalizar_texto)
+
+    return df_btp, df_ayz

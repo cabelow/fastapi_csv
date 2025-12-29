@@ -115,3 +115,36 @@ def match_semantico_com_referencia(valor_btp: str, valor_ayz: str, mapa: dict, t
         return {"status": "match_semantico", "score": round(melhor_score, 3)}
 
     return {"status": "divergente", "score": round(melhor_score, 3)}
+
+
+def match_com_referencia(valor_btp: str, valor_ayz: str, de_para: dict, threshold: float) -> dict:
+    """
+    Retorna um dict:
+    {
+        status: match_exato | match_de_para | match_semantico | divergente,
+        score: float
+    }
+    """
+    v1 = valor_btp.lower().strip()
+    v2 = valor_ayz.lower().strip()
+
+    if v1 == v2:
+        return {"status": "match_exato", "score": 1.0}
+
+    # Checa DE–PARA
+    for canonico, variacoes in de_para.items():
+        if isinstance(variacoes, list):
+            if (v1 == canonico and v2 in variacoes) or (v2 == canonico and v1 in variacoes):
+                return {"status": "match_de_para", "score": 1.0}
+        else:
+            if (v1 == canonico and v2 == variacoes) or (v2 == canonico and v1 == variacoes):
+                return {"status": "match_de_para", "score": 1.0}
+
+    # Checa similaridade semântica
+    candidatos = list(de_para.keys()) + [v for vs in de_para.values() for v in (vs if isinstance(vs, list) else [vs])]
+    melhor_score = max(similaridade_semantica(v1, ref) for ref in candidatos)
+
+    if melhor_score >= threshold:
+        return {"status": "match_semantico", "score": round(melhor_score, 3)}
+
+    return {"status": "divergente", "score": round(melhor_score, 3)}

@@ -1,26 +1,24 @@
+# services/integracao.py
+
 from utils.normalizacao import normalizar_cpf, normalizar_texto
 from services.semantic_matcher import similaridade_semantica
 from services.de_para import (
     DE_PARA_DEPARTMENT_CODE,
     DE_PARA_POSITION_CODE,
     DE_PARA_DEPARTMENT_NAME,
+    match_com_referencia,
     validar_de_para,
 )
 
-# ============================================================
-# Configurações de DE–PARA
-# ============================================================
+# Thresholds
+THRESHOLD_SEMANTICO = 0.85
+THRESHOLD_FULLNAME_DEFAULT = 0.5
 
 CAMPOS_DE_PARA = {
     "department_code": DE_PARA_DEPARTMENT_CODE,
     "position_code": DE_PARA_POSITION_CODE,
 }
 
-# Thresholds fixos
-THRESHOLD_SEMANTICO = 0.85  # department_name e cidades
-THRESHOLD_FULLNAME = 0.5    # full_name (pode vir de query param)
-
-# Campos a comparar
 CAMPOS_COMPARACAO = [
     ("full_name", "nome_funcionario"),
     ("unit_code", "cod_unid"),
@@ -32,59 +30,93 @@ CAMPOS_COMPARACAO = [
 ]
 
 # ============================================================
-# Normalização de dataframes
+# Comparação de um campo
 # ============================================================
-
-def normalizar_dataframes(df_btp, df_ayz):
-    df_btp["document_number"] = df_btp["document_number"].apply(normalizar_cpf)
-    df_btp["full_name"] = df_btp["full_name"].apply(normalizar_texto)
-
-    df_ayz["cpf"] = df_ayz["cpf"].apply(normalizar_cpf)
-    df_ayz["nome_funcionario"] = df_ayz["nome_funcionario"].apply(normalizar_texto)
-
-    return df_btp, df_ayz
-
-# ============================================================
-# Comparação com DE–PARA + IA
-# ============================================================
-
-def match_com_referencia(valor_btp: str, valor_ayz: str, de_para: dict, threshold: float) -> dict:
+def comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname=THRESHOLD_FULLNAME_DEFAULT):
     """
-    Retorna um dict:
+    Retorna dict com:
     {
-        status: match_exato | match_de_para | match_semantico | divergente,
-        score: float
+        "status": aceito | divergente | match_semantico | match_de_para | exato,
+        "score": float,
+        "regra": regra utilizada
     }
     """
-    v1 = valor_btp.lower().strip()
-    v2 = valor_ayz.lower().strip()
 
-    if v1 == v2:
-        return {"status": "match_exato", "score": 1.0}
+    valor_btp_norm = normalizar_texto(valor_btp)
+    valor_ayz_norm = normalizar_texto(valor_ayz)
 
-    # Checa DE–PARA
-    for canonico, variacoes in de_para.items():
-        if isinstance(variacoes, list):
-            if (v1 == canonico and v2 in variacoes) or (v2 == canonico and v1 in variacoes):
-                return {"status": "match_de_para", "score": 1.0}
-        else:
-            if (v1 == canonico and v2 == variacoes) or (v2 == canonico and v1 == variacoes):
-                return {"status": "match_de_para", "score": 1.0}
+    if valor_btp_norm == valor_ayz_norm:
+        return {"status": "exato", "score": 1.0, "regra": "exato"}
 
-    # Checa similaridade semântica
-    candidatos = list(de_para.keys()) + [v for vs in de_para.values() for v in (vs if isinstance(vs, list) else [vs])]
-    melhor_score = max(similaridade_semantica(v1, ref) for ref in candidatos)
+    # DE–PARA para códigos (binário)
+    if campo_btp in CAMPOS_DE_PARA:
+        aceito = validar_de_para(valor_btp_norm, valor_ayz_norm, CAMPOS_DE_PARA[campo_btp])
+        score = 1.0 if aceito else 0.0
+        status = "aceito" if aceito else "divergente"
+        return {"status": status, "score": score, "regra": "de_para"}
 
-    if melhor_score >= threshold:
-        return {"status": "match_semantico", "score": round(melhor_score, 3)}
+    # department_name e unit_name → DE–PARA + IA
+    elif campo_btp in ["department_name", "unit_name"]:
+        resultado = match_com_referencia(valor_btp_norm, valor_ayz_norm, DE_PARA_DEPARTMENT_NAME, THRESHOLD_SEMANTICO)
+        aceito = resultado["status"] != "divergente"
+        score = resultado["score"]
+        status = "aceito" if aceito else "divergente"
+        return {"status": status, "score": score, "regra": resultado["status"]}
 
-    return {"status": "divergente", "score": round(melhor_score, 3)}
+    # full_name → IA apenas
+    else:
+        score = similaridade_semantica(valor_btp_norm, valor_ayz_norm)
+        aceito = score >= threshold_fullname
+        status = "aceito" if aceito else "divergente"
+        return {"status": status, "score": score, "regra": "semantica"}
 
 # ============================================================
-# Função principal
+# Processa um funcionário
 # ============================================================
+def processar_funcionario(btp_row, df_ayz, threshold_fullname=THRESHOLD_FULLNAME_DEFAULT):
+    cpf = btp_row["document_number"]
+    ayz_match = df_ayz[df_ayz["cpf"] == cpf]
 
-def comparar_funcionarios(df_btp, df_ayz, threshold_fullname: float = THRESHOLD_FULLNAME):
+    if ayz_match.empty:
+        return {"nao_encontrado": True, "cpf": cpf, "btp_id": btp_row.get("employee_id")}
+
+    ayz_row = ayz_match.iloc[0]
+    divergencias = {}
+    possui_divergencia_real = False
+
+    for campo_btp, campo_ayz in CAMPOS_COMPARACAO:
+        valor_btp = btp_row.get(campo_btp, "")
+        valor_ayz = ayz_row.get(campo_ayz, "")
+        resultado = comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname)
+
+        divergencias[campo_btp] = {
+            "btp": valor_btp,
+            "ayz": valor_ayz,
+            "status": resultado["status"],
+            "score": round(resultado["score"], 3),
+            "regra": resultado["regra"],
+        }
+
+        if resultado["status"] != "aceito":
+            possui_divergencia_real = True
+
+    registro_base = {
+        "cpf": cpf,
+        "btp_id": btp_row.get("employee_id"),
+        "ayz_id": ayz_row.get("cod_func"),
+    }
+
+    return {
+        "nao_encontrado": False,
+        "registro_base": registro_base,
+        "divergencias": divergencias,
+        "possui_divergencia_real": possui_divergencia_real,
+    }
+
+# ============================================================
+# Comparar todos os funcionários
+# ============================================================
+def comparar_funcionarios(df_btp, df_ayz, threshold_fullname=THRESHOLD_FULLNAME_DEFAULT):
     resultado = {
         "matches_exatos": [],
         "matches_semanticos": [],
@@ -94,75 +126,25 @@ def comparar_funcionarios(df_btp, df_ayz, threshold_fullname: float = THRESHOLD_
     }
 
     for _, btp_row in df_btp.iterrows():
-        cpf = btp_row["document_number"]
-        ayz_match = df_ayz[df_ayz["cpf"] == cpf]
+        info = processar_funcionario(btp_row, df_ayz, threshold_fullname)
 
-        if ayz_match.empty:
+        if info.get("nao_encontrado"):
             resultado["nao_encontrados"].append({
-                "cpf": cpf,
-                "btp_id": btp_row.get("employee_id"),
+                "cpf": info["cpf"],
+                "btp_id": info["btp_id"],
             })
             continue
 
-        ayz_row = ayz_match.iloc[0]
-        divergencias = {}
-        possui_divergencia_real = False
+        registro_base = info["registro_base"]
+        divergencias = info["divergencias"]
+        possui_divergencia_real = info["possui_divergencia_real"]
 
-        for campo_btp, campo_ayz in CAMPOS_COMPARACAO:
-            valor_btp = normalizar_texto(btp_row.get(campo_btp, ""))
-            valor_ayz = normalizar_texto(ayz_row.get(campo_ayz, ""))
-
-            if valor_btp == valor_ayz:
-                continue
-
-            # Regra DE–PARA (sem IA) para códigos
-            if campo_btp in CAMPOS_DE_PARA:
-                aceito = validar_de_para(valor_btp, valor_ayz, CAMPOS_DE_PARA[campo_btp])
-                score = 1.0 if aceito else 0.0
-                regra = "de_para"
-
-            # department_name e cidades → DE–PARA + IA
-            elif campo_btp in ["department_name", "unit_name"]:
-                resultado_match = match_com_referencia(valor_btp, valor_ayz, DE_PARA_DEPARTMENT_NAME, THRESHOLD_SEMANTICO)
-                aceito = resultado_match["status"] != "divergente"
-                score = resultado_match["score"]
-                regra = resultado_match["status"]
-
-            # full_name → IA apenas
-            else:
-                score = similaridade_semantica(valor_btp, valor_ayz)
-                aceito = score >= threshold_fullname
-                regra = "semantica"
-
-            divergencias[campo_btp] = {
-                "btp": valor_btp,
-                "ayz": valor_ayz,
-                "status": "aceito" if aceito else "divergente",
-                "score": round(score, 3),
-                "regra": regra,
-            }
-
-            if not aceito:
-                possui_divergencia_real = True
-
-        registro_base = {
-            "cpf": cpf,
-            "btp_id": btp_row.get("employee_id"),
-            "ayz_id": ayz_row.get("cod_func"),
-        }
-
-        if not divergencias:
+        if all(v["status"] == "exato" for v in divergencias.values()):
             resultado["matches_exatos"].append(registro_base)
         elif possui_divergencia_real:
-            resultado["divergencias_reais"].append({
-                **registro_base,
-                "divergencias": divergencias,
-            })
+            resultado["divergencias_reais"].append({**registro_base, "divergencias": divergencias})
         else:
-            resultado["matches_semanticos"].append({
-                **registro_base,
-                "divergencias": divergencias,
-            })
+            resultado["matches_semanticos"].append({**registro_base, "divergencias": divergencias})
 
     resultado["resumo"] = {
         "total_btp": len(df_btp),

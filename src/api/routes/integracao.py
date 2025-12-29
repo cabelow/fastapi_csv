@@ -4,9 +4,9 @@ from fastapi.responses import HTMLResponse
 from core.templates import templates
 from utils.csv_loader import carregar_btp, carregar_ayz
 from services.integracao import (
-    normalizar_dataframes,
     comparar_funcionarios,
 )
+from utils.normalizacao import normalizar_dataframes
 
 router = APIRouter()
 
