@@ -1,4 +1,4 @@
-## 1. Ambiente virtual ##
+## Ambiente virtual ##
 
 * venv
 python3 -m venv .venv
@@ -9,8 +9,12 @@ pip freeze > requirements.txt
 
 
 
-## 1.2 install fastapi ##
+## Install fastapi ##
 
 * install fastapi (se necessário)
 pip install fastapi uvicorn sqlalchemy pyodbc
 
+
+## Testar aplicação ##
+
+uvicorn main:app --reload --app-dir src

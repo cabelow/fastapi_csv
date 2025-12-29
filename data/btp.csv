@@ -1,11 +1,11 @@
 employee_id,full_name,document_number,unit_code,unit_name,department_code,department_name,position_code,position_name,hire_date,monthly_salary,employment_status
-EMP001,João Silva Santos,12345678900,U001,São Paulo - Matriz,D010,Tecnologia da Informação,P100,Analista de Sistemas,2020-03-15,8500.00,A
-EMP002,Maria Oliveira,23456789011,U001,São Paulo - Matriz,D020,Recursos Humanos,P101,Analista de RH,2019-05-20,7200.00,A
-EMP003,Pedro Costa,34567890122,U002,Rio de Janeiro - Filial,D010,Tecnologia da Informação,P102,Desenvolvedor,2021-01-10,6800.00,A
+EMP001,Joï¿½o Silva Santos,12345678900,U001,Sï¿½o Paulo - Matriz,D010,Tecnologia da Informaï¿½ï¿½o,P100,Analista de Sistemas,2020-03-15,8500.00,A
+EMP002,Maria Oliveira,23456789011,U001,Sï¿½o Paulo - Matriz,D020,Recursos Humanos,P101,Analista de RH,2019-05-20,7200.00,A
+EMP003,Pedro Costa,34567890122,U002,Rio de Janeiro - Filial,D010,Tecnologia da Informaï¿½ï¿½o,P102,Desenvolvedor,2021-01-10,6800.00,A
 EMP004,Ana Paula Souza,45678901233,U003,Belo Horizonte - Filial,D030,Financeiro,P103,Contador,2018-07-05,9200.00,A
 EMP005,Carlos Eduardo Lima,56789012344,U002,Rio de Janeiro - Filial,D040,Vendas,P104,Vendedor,2020-11-12,4500.00,A
-EMP006,Juliana Martins,67890123455,U001,São Paulo - Matriz,D010,Tecnologia da Informação,P105,Gerente de TI,2017-02-08,15000.00,A
-EMP007,Roberto Alves,78901234566,U004,Curitiba - Filial,D050,Logística,P106,Analista de Logística,2019-09-25,6200.00,A
+EMP006,Juliana Martins,67890123455,U001,Sï¿½o Paulo - Matriz,D010,Tecnologia da Informaï¿½ï¿½o,P105,Gerente de TI,2017-02-08,15000.00,A
+EMP007,Roberto Alves,78901234566,U004,Curitiba - Filial,D050,Logï¿½stica,P106,Analista de Logï¿½stica,2019-09-25,6200.00,A
 EMP008,Fernanda Santos,89012345677,U003,Belo Horizonte - Filial,D030,Financeiro,P107,Analista Financeiro,2021-04-30,7800.00,A
-EMP009,Lucas Pereira,90123456788,U002,Rio de Janeiro - Filial,D010,Tecnologia da Informação,P100,Analista de Sistemas,2022-06-18,8200.00,A
-EMP010,Patricia Rodrigues,01234567899,U001,São Paulo - Matriz,D020,Recursos Humanos,P108,Gerente de RH,2016-08-14,13500.00,A
+EMP009,Lucas Pereira,90123456788,U002,Rio de Janeiro - Filial,D010,Tecnologia da Informaï¿½ï¿½o,P100,Analista de Sistemas,2022-06-18,8200.00,A
+EMP010,Patricia Rodrigues,01234567899,U001,Sï¿½o Paulo - Matriz,D020,Recursos Humanos,P108,Gerente de RH,2016-08-14,13500.00,A
