@@ -14,3 +14,8 @@ ayz.csv: text/csv; charset=iso-8859-1
 ## Executar aplicalão ##
 
 uvicorn main:app --reload --app-dir src
+
+
+## Atualizar libs ##
+
+pip freeze > requirements.txt

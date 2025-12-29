@@ -7,10 +7,23 @@
         body { font-family: Arial, sans-serif; margin: 20px; }
         h2 { margin-top: 40px; }
         table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-        th, td { border: 1px solid #ccc; padding: 6px; }
+        th, td { border: 1px solid #ccc; padding: 6px; font-size: 14px; }
         th { background: #f0f0f0; }
-        .ok { color: green; }
-        .erro { color: red; }
+
+        .ok { color: green; font-weight: bold; }
+        .erro { color: red; font-weight: bold; }
+        .warn { color: orange; font-weight: bold; }
+
+        .status-aceito { background-color: #e6ffe6; }
+        .status-divergente { background-color: #ffe6e6; }
+
+        .cpf-header {
+            margin-top: 30px;
+            font-weight: bold;
+            background: #fafafa;
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
     </style>
 </head>
 <body>
@@ -21,44 +34,101 @@
 <ul>
     <li>Total BTP: {{ resultado.resumo.total_btp }}</li>
     <li>Total AYZ: {{ resultado.resumo.total_ayz }}</li>
-    <li class="ok">Matches: {{ resultado.resumo.matches }}</li>
-    <li class="erro">Divergências: {{ resultado.resumo.divergencias }}</li>
+    <li class="ok">Matches exatos: {{ resultado.resumo.matches_exatos }}</li>
+    <li class="warn">Matches semânticos: {{ resultado.resumo.matches_semanticos }}</li>
+    <li class="erro">Divergências reais: {{ resultado.resumo.divergencias_reais }}</li>
     <li class="erro">Não encontrados: {{ resultado.resumo.nao_encontrados }}</li>
 </ul>
 
-<h2>✅ Matches</h2>
+<hr>
+
+<h2>✅ Matches exatos</h2>
 <table>
     <tr>
         <th>CPF</th>
         <th>BTP ID</th>
         <th>AYZ ID</th>
     </tr>
-    {% for item in resultado.matches %}
+    {% for item in resultado.matches_exatos %}
     <tr>
         <td>{{ item.cpf }}</td>
         <td>{{ item.btp_id }}</td>
         <td>{{ item.ayz_id }}</td>
     </tr>
+    {% else %}
+    <tr>
+        <td colspan="3">Nenhum match exato encontrado</td>
+    </tr>
     {% endfor %}
 </table>
 
-<h2>⚠️ Divergências</h2>
-{% for item in resultado.divergencias %}
-    <h3>CPF {{ item.cpf }}</h3>
+<h2>🧠 Matches semânticos (IA)</h2>
+
+{% for item in resultado.matches_semanticos %}
+    <div class="cpf-header">
+        CPF {{ item.cpf }} | BTP: {{ item.btp_id }} | AYZ: {{ item.ayz_id }}
+    </div>
+
     <table>
         <tr>
             <th>Campo</th>
             <th>BTP</th>
             <th>AYZ</th>
+            <th>Status</th>
+            <th>Score</th>
         </tr>
+
         {% for campo, valores in item.divergencias.items() %}
-        <tr>
+        <tr class="status-aceito">
             <td>{{ campo }}</td>
             <td>{{ valores.btp }}</td>
             <td>{{ valores.ayz }}</td>
+            <td>
+                <span class="ok">Aceito semanticamente</span>
+            </td>
+            <td>{{ "%.3f"|format(valores.score) }}</td>
         </tr>
         {% endfor %}
     </table>
+{% else %}
+    <p>Nenhum match semântico encontrado.</p>
+{% endfor %}
+
+
+<h2>⚠️ Divergências reais</h2>
+
+{% for item in resultado.divergencias_reais %}
+    <div class="cpf-header">
+        CPF {{ item.cpf }} | BTP: {{ item.btp_id }} | AYZ: {{ item.ayz_id }}
+    </div>
+
+    <table>
+        <tr>
+            <th>Campo</th>
+            <th>BTP</th>
+            <th>AYZ</th>
+            <th>Status</th>
+            <th>Score</th>
+        </tr>
+
+        {% for campo, valores in item.divergencias.items() %}
+        <tr class="{% if valores.status == 'aceito_semanticamente' %}status-aceito{% else %}status-divergente{% endif %}">
+            <td>{{ campo }}</td>
+            <td>{{ valores.btp }}</td>
+            <td>{{ valores.ayz }}</td>
+            <td>
+                {% if valores.status == 'aceito_semanticamente' %}
+                    <span class="ok">Aceito semanticamente</span>
+                {% else %}
+                    <span class="erro">Divergente</span>
+                {% endif %}
+            </td>
+            <td>{{ "%.3f"|format(valores.score) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+{% else %}
+    <p>Nenhuma divergência encontrada.</p>
 {% endfor %}
 
 <h2>❌ Não encontrados no AYZ</h2>
@@ -71,6 +141,10 @@
     <tr>
         <td>{{ item.cpf }}</td>
         <td>{{ item.btp_id }}</td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="2">Nenhum registro ausente</td>
     </tr>
     {% endfor %}
 </table>

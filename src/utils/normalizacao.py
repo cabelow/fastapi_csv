@@ -1,14 +1,40 @@
-import pandas as pd
+import re
 import unicodedata
 
-def normalizar_cpf(cpf: str) -> str:
-    if pd.isna(cpf):
-        return None
-    return "".join(filter(str.isdigit, str(cpf)))
+
+import unicodedata
+import re
+
 
 def normalizar_texto(texto: str) -> str:
-    if pd.isna(texto):
+    if not texto:
+        return ""
+
+    try:
+        texto = texto.encode("latin1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+
+    texto = unicodedata.normalize("NFKC", texto)
+
+    texto = texto.replace("�", " ")
+
+    texto = re.sub(r"\s+", " ", texto)
+
+    return texto.strip().lower()
+
+
+
+import re
+import pandas as pd
+
+def normalizar_cpf(cpf):
+    if pd.isna(cpf):
         return None
-    texto = texto.strip()
-    texto = unicodedata.normalize("NFKD", texto).encode("ASCII", "ignore").decode("ASCII")
-    return texto
+
+    cpf = str(cpf)
+    cpf = re.sub(r"\D", "", cpf)
+
+    if len(cpf) != 11:
+        return cpf
+    return cpf
