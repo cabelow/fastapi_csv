@@ -1,0 +1,26 @@
+cod_func,nome_funcionario,cpf,cod_unid,unidade,cod_setor,setor,cod_cargo,cargo,data_admissao,salario,status
+F001,João Silva Santos,123.456.789-00,UN01,Matriz São Paulo,ST10,TI,CG100,Analista de Sistemas,15/03/2020,8500.00,ATIVO
+F002,Maria Oliveira,234.567.890-11,UN01,Matriz SP,ST11,Recursos Humanos,CG101,Analista RH,20/05/2019,7200.00,ATIVO
+F003,Pedro Costa,345.678.901-22,UN02,Filial Rio de Janeiro,ST10,Tecnologia da Informação,CG102,Desenvolvedor,10/01/2021,6800.00,ATIVO
+F004,Ana Paula Souza,456.789.012-33,UN03,Filial BH,ST12,Financeiro,CG103,Contador,05/07/2018,9200.00,ATIVO
+F005,Carlos Eduardo Lima,567.890.123-44,UN02,Filial RJ,ST13,Vendas,CG104,Vendedor,12/11/2020,4500.00,ATIVO
+F006,Juliana Martins,678.901.234-55,UN01,Matriz São Paulo,ST10,TI,CG105,Gerente de TI,08/02/2017,15000.00,ATIVO
+F007,Roberto Alves,789.012.345-66,UN04,Filial Curitiba,ST14,Logística,CG106,Analista Logística,25/09/2019,6200.00,ATIVO
+F008,Fernanda Santos,890.123.456-77,UN03,Filial Belo Horizonte,ST12,Financeiro,CG107,Analista Financeiro,30/04/2021,7800.00,ATIVO
+F009,Lucas Pereira,901.234.567-88,UN02,Filial Rio de Janeiro,ST10,TI,CG100,Analista Sistemas,18/06/2022,8200.00,ATIVO
+F010,Patricia Rodrigues,012.345.678-99,UN01,Matriz SP,ST11,RH,CG108,Gerente RH,14/08/2016,13500.00,ATIVO
+F011,Bruno Ferreira,111.222.333-44,UN05,Filial Porto Alegre,ST13,Comercial,CG104,Vendedor Externo,22/03/2021,5200.00,ATIVO
+F012,Camila Nunes,222.333.444-55,UN01,MATRIZ SAO PAULO,ST15,Marketing,CG109,Analista de Marketing,11/09/2020,7500.00,ATIVO
+F013,Diego Souza,333.444.555-66,UN02,FIL RIO DE JANEIRO,ST10,Tecnologia,CG110,Dev Backend,05/12/2021,9500.00,ATIVO
+F014,Elaine Costa,444.555.666-77,,Filial Salvador,ST16,Atendimento,CG111,Atendente,28/02/2022,3800.00,ATIVO
+F015,Fabio Lima,555.666.777-88,UN03,Filial BH,ST12,Contabilidade,CG103,Contador Senior,17/06/2019,11000.00,ATIVO
+F016,Gabriela Rocha,666.777.888-99,UN04,Filial Curitiba,ST14,Supply Chain,CG112,Coordenador Logística,09/10/2018,12500.00,ATIVO
+F017,Henrique Dias,777.888.999-00,UN01,Matriz SP,ST17,Jurídico,CG113,Advogado,21/01/2020,14000.00,ATIVO
+F018,Isabela Mendes,888.999.000-11,UN05,Filial POA,ST13,Vendas,CG114,Gerente Comercial,13/04/2017,16000.00,ATIVO
+F019,Jorge Santos,999.000.111-22,UN02,Filial Rio de Janeiro,ST18,Suporte Técnico,CG115,Técnico Suporte,07/08/2021,4200.00,ATIVO
+F020,Kelly Oliveira,000.111.222-33,UN03,Filial Belo Horizonte,ST11,Gestão de Pessoas,CG101,Analista RH Pleno,19/11/2020,8000.00,ATIVO
+F021,Leonardo Almeida,111.222.333-00,UN06,Filial Brasília,ST19,Compliance,CG116,Analista Compliance,02/05/2022,9800.00,ATIVO
+F022,Mariana Cardoso,,UN01,Matriz São Paulo,ST10,TI,CG117,Scrum Master,26/07/2021,10500.00,ATIVO
+F023,Nicolas Barbosa,333.444.555-11,UN02,Filial RJ,ST15,Mkt Digital,CG118,Designer,15/09/2020,6500.00,INATIVO
+F024,Olivia Teixeira,444.555.666-22,UN04,Filial Curitiba,ST20,Qualidade,CG119,Analista Qualidade,08/03/2019,7300.00,ATIVO
+F025,Paulo Henrique Sousa,555.666.777-33,UN01,Matriz São Paulo,ST10,Infraestrutura TI,CG120,Analista Infraestrutura,31/10/2018,8800.00,ATIVO
