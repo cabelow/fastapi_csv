@@ -1,27 +1,24 @@
 """
 services/de_para.py
 
-Contém regras de DE–PARA entre BTP e AYZ.
-Usado para validação determinística (sem IA) e como referência semântica.
+Regras de DE–PARA entre BTP e AYZ:
+- Validação determinística (sem IA)
+- Referência semântica (IA + DE–PARA)
 """
 
+from services.semantic_matcher import similaridade_semantica
 
 # ============================================================
-# Utilidades
+# Utilitários
 # ============================================================
 
 def normalizar_chave(valor: str) -> str:
-    """
-    Normaliza valores para comparação:
-    - lowercase
-    - trim
-    - protege contra None
-    """
+    """Normaliza valores para comparação: lower + trim + proteção contra None"""
     return str(valor or "").lower().strip()
 
 
 # ============================================================
-# DE–PARA DE CÓDIGOS (determinístico, sem IA)
+# DE–PARA determinístico (códigos)
 # ============================================================
 
 DE_PARA_DEPARTMENT_CODE = {
@@ -43,50 +40,27 @@ DE_PARA_POSITION_CODE = {
     "p107": "cg107",
 }
 
-
-# ============================================================
-# DE–PARA DE NOMES (referência + IA)
-# ============================================================
-
+# DE–PARA de nomes/cidades (referência + IA)
 DE_PARA_DEPARTMENT_NAME = {
     "tecnologia da informacao": ["ti", "tec info", "tecnologia informação", "tech info", "informática"],
     "recursos humanos": ["rh", "rec humanos", "recursos humanos", "human resources"],
     "financeiro": ["fin", "financeiro", "finance department", "contabilidade"],
-    "marketing": ["mkt", "marketing", "marketing dept", "comercial marketing"],
-    "vendas": ["sales", "vendas", "comercial vendas", "comercial"],
-    "juridico": ["juridico", "legal", "legal dept"],
-    "administracao": ["adm", "administração", "administration"],
-    "suporte": ["support", "suporte", "help desk", "service desk"],
-    "logistica": ["logistics", "logistica", "transporte", "supply chain"],
-    "pesquisa e desenvolvimento": ["p&d", "pesquisa desenvolvimento", "r&d", "research and development"],
-    #cidades
-    "sao paulo": ["filial", "matriz", "sp", "são paulo", "sao paulo - matriz", "são paulo - matriz", "s.p."],
+    # cidades
+    "sao paulo": ["filial", "matriz", "sp", "são paulo", "sao paulo - matriz", "s.p."],
     "rio de janeiro": ["filial", "matriz", "rj", "rio", "rio de janeiro - filial", "r. janeiro"],
     "belo horizonte": ["filial", "matriz", "bh", "belo horizonte - filial", "b. horizonte"],
     "curitiba": ["filial", "matriz", "cwb", "curitiba - filial", "c.itiba"],
-    "porto alegre": ["filial", "matriz", "poa", "porto alegre - filial", "p. alegre"],
-    "salvador": ["filial", "matriz", "ssa", "salvador - filial", "s.ador"],
-    "fortaleza": ["filial", "matriz", "for", "fortaleza - filial", "f.aleza"],
-    "recife": ["filial", "matriz", "rec", "recife - filial", "r. fice"],
-    "brasília": ["filial", "matriz", "bsb", "brasilia", "brasília - filial", "b.ília"],
-    "campinas": ["filial", "matriz", "cps", "campinas - filial", "c. mpinas"],
 }
 
-
 # ============================================================
-# Validação DE–PARA (bidirecional)
+# Validação DE–PARA
 # ============================================================
 
 def validar_de_para(valor_btp: str, valor_ayz: str, mapa: dict) -> bool:
     """
-    Valida se dois valores correspondem via DE–PARA.
-
-    Regras:
-    - Case-insensitive
-    - Bidirecional
-    - Funciona para códigos ou nomes
+    Valida se dois valores correspondem via DE–PARA (bidirecional).
+    Funciona para códigos ou nomes.
     """
-
     v1 = normalizar_chave(valor_btp)
     v2 = normalizar_chave(valor_ayz)
 
@@ -101,16 +75,43 @@ def validar_de_para(valor_btp: str, valor_ayz: str, mapa: dict) -> bool:
 
         if isinstance(variacoes, list):
             variacoes_norm = [normalizar_chave(v) for v in variacoes]
-
-            if (v1 == canonico_norm and v2 in variacoes_norm) or \
-               (v2 == canonico_norm and v1 in variacoes_norm):
+            if (v1 == canonico_norm and v2 in variacoes_norm) or (v2 == canonico_norm and v1 in variacoes_norm):
                 return True
-
         else:
             variacao_norm = normalizar_chave(variacoes)
-
-            if (v1 == canonico_norm and v2 == variacao_norm) or \
-               (v2 == canonico_norm and v1 == variacao_norm):
+            if (v1 == canonico_norm and v2 == variacao_norm) or (v2 == canonico_norm and v1 == variacao_norm):
                 return True
 
     return False
+
+
+def match_semantico_com_referencia(valor_btp: str, valor_ayz: str, mapa: dict, threshold: float) -> dict:
+    """
+    Combina DE–PARA + IA:
+    - Se bate exatamente ou DE–PARA -> status match
+    - Se IA >= threshold -> status match_semantico
+    - Senão -> divergente
+    """
+    v1 = normalizar_chave(valor_btp)
+    v2 = normalizar_chave(valor_ayz)
+
+    if v1 == v2:
+        return {"status": "match_exato", "score": 1.0}
+
+    if validar_de_para(v1, v2, mapa):
+        return {"status": "match_de_para", "score": 1.0}
+
+    # IA pura contra todos valores do mapa
+    candidatos = [normalizar_chave(c) for c in mapa.keys()]
+    for vs in mapa.values():
+        if isinstance(vs, list):
+            candidatos.extend([normalizar_chave(v) for v in vs])
+        else:
+            candidatos.append(normalizar_chave(vs))
+
+    melhor_score = max([similaridade_semantica(v1, ref) for ref in candidatos] + [0.0])
+
+    if melhor_score >= threshold:
+        return {"status": "match_semantico", "score": round(melhor_score, 3)}
+
+    return {"status": "divergente", "score": round(melhor_score, 3)}

@@ -7,15 +7,20 @@ from services.de_para import (
     validar_de_para,
 )
 
+# ============================================================
+# Configurações de DE–PARA
+# ============================================================
 
 CAMPOS_DE_PARA = {
     "department_code": DE_PARA_DEPARTMENT_CODE,
     "position_code": DE_PARA_POSITION_CODE,
 }
 
+# Thresholds fixos
+THRESHOLD_SEMANTICO = 0.85  # department_name e cidades
+THRESHOLD_FULLNAME = 0.5    # full_name (pode vir de query param)
 
-SEMANTIC_THRESHOLD = 0.85
-
+# Campos a comparar
 CAMPOS_COMPARACAO = [
     ("full_name", "nome_funcionario"),
     ("unit_code", "cod_unid"),
@@ -26,6 +31,9 @@ CAMPOS_COMPARACAO = [
     ("position_name", "cargo"),
 ]
 
+# ============================================================
+# Normalização de dataframes
+# ============================================================
 
 def normalizar_dataframes(df_btp, df_ayz):
     df_btp["document_number"] = df_btp["document_number"].apply(normalizar_cpf)
@@ -36,47 +44,47 @@ def normalizar_dataframes(df_btp, df_ayz):
 
     return df_btp, df_ayz
 
-def match_com_referencia(
-    valor_btp: str,
-    valor_ayz: str,
-    de_para: dict,
-    threshold: float,
-) -> dict:
+# ============================================================
+# Comparação com DE–PARA + IA
+# ============================================================
+
+def match_com_referencia(valor_btp: str, valor_ayz: str, de_para: dict, threshold: float) -> dict:
     """
-    Retorna:
+    Retorna um dict:
     {
         status: match_exato | match_de_para | match_semantico | divergente,
         score: float
     }
     """
-
     v1 = valor_btp.lower().strip()
     v2 = valor_ayz.lower().strip()
 
     if v1 == v2:
         return {"status": "match_exato", "score": 1.0}
 
+    # Checa DE–PARA
     for canonico, variacoes in de_para.items():
-        if v1 == canonico and v2 in variacoes:
-            return {"status": "match_de_para", "score": 1.0}
-        if v2 == canonico and v1 in variacoes:
-            return {"status": "match_de_para", "score": 1.0}
+        if isinstance(variacoes, list):
+            if (v1 == canonico and v2 in variacoes) or (v2 == canonico and v1 in variacoes):
+                return {"status": "match_de_para", "score": 1.0}
+        else:
+            if (v1 == canonico and v2 == variacoes) or (v2 == canonico and v1 == variacoes):
+                return {"status": "match_de_para", "score": 1.0}
 
-    candidatos = [canonico for canonico in de_para.keys()]
-    candidatos += [v for vs in de_para.values() for v in vs]
-
-    melhor_score = 0.0
-    for ref in candidatos:
-        score = similaridade_semantica(v1, ref)
-        melhor_score = max(melhor_score, score)
+    # Checa similaridade semântica
+    candidatos = list(de_para.keys()) + [v for vs in de_para.values() for v in (vs if isinstance(vs, list) else [vs])]
+    melhor_score = max(similaridade_semantica(v1, ref) for ref in candidatos)
 
     if melhor_score >= threshold:
         return {"status": "match_semantico", "score": round(melhor_score, 3)}
 
     return {"status": "divergente", "score": round(melhor_score, 3)}
 
+# ============================================================
+# Função principal
+# ============================================================
 
-def comparar_funcionarios(df_btp, df_ayz, threshold: float):
+def comparar_funcionarios(df_btp, df_ayz, threshold_fullname: float = THRESHOLD_FULLNAME):
     resultado = {
         "matches_exatos": [],
         "matches_semanticos": [],
@@ -87,8 +95,8 @@ def comparar_funcionarios(df_btp, df_ayz, threshold: float):
 
     for _, btp_row in df_btp.iterrows():
         cpf = btp_row["document_number"]
-
         ayz_match = df_ayz[df_ayz["cpf"] == cpf]
+
         if ayz_match.empty:
             resultado["nao_encontrados"].append({
                 "cpf": cpf,
@@ -107,25 +115,23 @@ def comparar_funcionarios(df_btp, df_ayz, threshold: float):
             if valor_btp == valor_ayz:
                 continue
 
+            # Regra DE–PARA (sem IA) para códigos
             if campo_btp in CAMPOS_DE_PARA:
                 aceito = validar_de_para(valor_btp, valor_ayz, CAMPOS_DE_PARA[campo_btp])
                 score = 1.0 if aceito else 0.0
                 regra = "de_para"
 
-            elif campo_btp == "department_name":
-                resultado_match = match_com_referencia(
-                    valor_btp,
-                    valor_ayz,
-                    DE_PARA_DEPARTMENT_NAME,
-                    threshold,
-                )
+            # department_name e cidades → DE–PARA + IA
+            elif campo_btp in ["department_name", "unit_name"]:
+                resultado_match = match_com_referencia(valor_btp, valor_ayz, DE_PARA_DEPARTMENT_NAME, THRESHOLD_SEMANTICO)
                 aceito = resultado_match["status"] != "divergente"
                 score = resultado_match["score"]
                 regra = resultado_match["status"]
 
+            # full_name → IA apenas
             else:
                 score = similaridade_semantica(valor_btp, valor_ayz)
-                aceito = score >= threshold
+                aceito = score >= threshold_fullname
                 regra = "semantica"
 
             divergencias[campo_btp] = {
@@ -147,13 +153,11 @@ def comparar_funcionarios(df_btp, df_ayz, threshold: float):
 
         if not divergencias:
             resultado["matches_exatos"].append(registro_base)
-
         elif possui_divergencia_real:
             resultado["divergencias_reais"].append({
                 **registro_base,
                 "divergencias": divergencias,
             })
-
         else:
             resultado["matches_semanticos"].append({
                 **registro_base,
@@ -167,7 +171,8 @@ def comparar_funcionarios(df_btp, df_ayz, threshold: float):
         "matches_semanticos": len(resultado["matches_semanticos"]),
         "divergencias_reais": len(resultado["divergencias_reais"]),
         "nao_encontrados": len(resultado["nao_encontrados"]),
-        "threshold_utilizado": threshold,
+        "threshold_semantico": THRESHOLD_SEMANTICO,
+        "threshold_fullname": threshold_fullname,
     }
 
     return resultado
