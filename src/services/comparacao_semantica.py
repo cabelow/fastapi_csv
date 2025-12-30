@@ -1,29 +1,42 @@
 import os
 from rapidfuzz import fuzz
+from sentence_transformers import SentenceTransformer
 from utils.normalizacao import normalizar_semantico
 
-USE_AI = os.getenv("USE_SEMANTIC_AI", "false").lower() == "true"
 
-_model = None
+import os
+from pathlib import Path
+from sentence_transformers import SentenceTransformer
+
+BASE_SRC = Path(__file__).resolve().parent.parent
+
+_MODEL_PATH = os.path.join(BASE_SRC, "utils", "transformer_model")
+
+_model = SentenceTransformer(_MODEL_PATH)
+
+USE_AI = os.getenv("USE_SEMANTIC_AI", "false").lower() == "true"
+_MODEL = None
+_MODEL_PATH = "app/transformer_model"
 
 def _load_model():
-    global _model
-    if _model is None:
+    global _MODEL
+    if _MODEL is None:
         from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _model
+        _MODEL = SentenceTransformer(_MODEL_PATH)
+    return _MODEL
 
 def fuzzy_match(a: str, b: str, threshold: int = 90) -> bool:
-    score = fuzz.token_sort_ratio(a, b)
-    return score >= threshold
+    if not a or not b:
+        return False
+    return fuzz.token_sort_ratio(a, b) >= threshold
 
 def semantic_match(a: str, b: str, threshold: float = 0.85) -> bool:
-    if not USE_AI:
+    if not USE_AI or not a or not b:
         return False
 
     model = _load_model()
-
     from sentence_transformers import util
+    
     emb1 = model.encode(a, convert_to_tensor=True)
     emb2 = model.encode(b, convert_to_tensor=True)
 

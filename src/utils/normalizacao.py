@@ -6,14 +6,14 @@ import unicodedata
 import re
 
 
-def normalizar_texto(texto: str) -> str:
-    if not texto:
-        return ""
+import unicodedata
+import re
 
-    try:
-        texto = texto.encode("latin1").decode("utf-8")
-    except (UnicodeEncodeError, UnicodeDecodeError):
-        pass
+def normalizar_texto(texto) -> str:
+    if texto is None:
+        return ""
+    
+    texto = str(texto)
 
     texto = unicodedata.normalize("NFKC", texto)
 

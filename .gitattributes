@@ -1,0 +1,2 @@
+src/utils/transformer_model/* filter=lfs diff=lfs merge=lfs -text
+src/utils/transformer_model/model.safetensors filter=lfs diff=lfs merge=lfs -text

@@ -1,43 +1,136 @@
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-
+from fastapi import APIRouter, Request, Query, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, FileResponse
+from weasyprint import HTML
+import tempfile
+import csv
+import os
 from core.templates import templates
 from utils.csv_loader import carregar_btp, carregar_ayz
-from services.integracao import (
-    comparar_funcionarios,
-)
+from services.integracao import comparar_funcionarios
 from utils.normalizacao import normalizar_dataframes
+
+import pandas as pd
+import io
+import chardet
+
 
 router = APIRouter()
 
-@router.get("/integracao/comparar")
-def comparar(threshold: float = 0.85):
+def gerar_resultado(ia_name: float, ia_depara: float):
     df_btp = carregar_btp("data/btp.csv")
     df_ayz = carregar_ayz("data/ayz.csv")
+    df_btp, df_ayz = normalizar_dataframes(df_btp, df_ayz)
+    return comparar_funcionarios(df_btp, df_ayz, threshold_fullname=ia_name, threshold_semantico=ia_depara)
+
+
+@router.get("/comparar/view", response_class=HTMLResponse)
+def comparar_view(
+    request: Request,
+    ia_name: float = Query(0.85, description="Threshold para full_name"),
+    ia_depara: float = Query(0.85, description="Threshold para semantic match")
+):
+    resultado = gerar_resultado(ia_name, ia_depara)
+    return templates.TemplateResponse(
+        "integracao_comparacao.html",
+        {
+            "request": request,
+            "resultado": resultado,
+            "ia_name": ia_name,
+            "ia_depara": ia_depara
+        }
+    )
+
+
+
+@router.post("/processar-upload", response_class=HTMLResponse)
+async def processar_upload(
+    request: Request,
+    btp_file: UploadFile,
+    ayz_file: UploadFile,
+    ia_name: float = Form(0.85),
+    ia_depara: float = Form(0.85)
+):
+    """
+    Processa os arquivos CSV enviados pelo usuário, compara os dados e retorna o resultado.
+    """ 
+    btp_bytes = await btp_file.read()
+    encoding_btp = chardet.detect(btp_bytes)['encoding']
+    df_btp = pd.read_csv(io.BytesIO(btp_bytes), encoding=encoding_btp)
+
+    ayz_bytes = await ayz_file.read()
+    encoding_ayz = chardet.detect(ayz_bytes)['encoding']
+    df_ayz = pd.read_csv(io.BytesIO(ayz_bytes), encoding=encoding_ayz)
 
     df_btp, df_ayz = normalizar_dataframes(df_btp, df_ayz)
-    resultado = comparar_funcionarios(df_btp, df_ayz, threshold)
 
-    return {"mapping": resultado}
-
-
-@router.get(
-    "/integracao/comparar/view",
-    response_class=HTMLResponse,
-)
-def comparar_view(request: Request, threshold: float = 0.85):
-    df_btp = carregar_btp("data/btp.csv")
-    df_ayz = carregar_ayz("data/ayz.csv")
-
-    df_btp, df_ayz = normalizar_dataframes(df_btp, df_ayz)
-    resultado = comparar_funcionarios(df_btp, df_ayz, threshold)
+    resultado = comparar_funcionarios(df_btp, df_ayz, threshold_fullname=ia_name, threshold_semantico=ia_depara)
 
     return templates.TemplateResponse(
         "integracao_comparacao.html",
         {
             "request": request,
             "resultado": resultado,
-            "threshold": threshold,
+            "ia_name": ia_name,
+            "ia_depara": ia_depara
         }
     )
 
+@router.get("/inicio", response_class=HTMLResponse)
+def inicio(request: Request):
+    """
+    Tela inicial para enviar arquivos CSV e configurar thresholds.
+    """
+    return templates.TemplateResponse(
+        "integracao_inicio.html",
+        {
+            "request": request,
+            "resultado": None,
+            "threshold": 0.85,
+            "threshold2": 0.85
+        }
+    )
+
+
+@router.get("/comparar/download/pdf", response_class=FileResponse)
+def download_pdf(
+    ia_name: float = Query(0.85, description="Threshold para full_name"),
+    ia_depara: float = Query(0.85, description="Threshold para semantic match")
+):
+    resultado = gerar_resultado(ia_name, ia_depara)
+    html_content = templates.get_template("integracao_comparacao.html").render(
+        request={},
+        resultado=resultado,
+        ia_name=ia_name,
+        ia_depara=ia_depara
+    )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        HTML(string=html_content).write_pdf(tmp_pdf.name)
+        tmp_pdf_path = tmp_pdf.name
+
+    return FileResponse(tmp_pdf_path, media_type="application/pdf", filename="comparacao_btp_ayz.pdf")
+
+
+@router.get("/comparar/download/csv", response_class=FileResponse)
+def download_csv(
+    ia_name: float = Query(0.85, description="Threshold para full_name"),
+    ia_depara: float = Query(0.85, description="Threshold para semantic match")
+):
+    resultado = gerar_resultado(ia_name, ia_depara)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="w", newline="", encoding="utf-8") as tmp_csv:
+        writer = csv.writer(tmp_csv)
+        writer.writerow(["cpf", "btp_id", "ayz_id", "campo", "btp", "ayz", "status", "score", "regra"])
+
+        for item in resultado.get("divergencias_reais", []):
+            cpf = item["cpf"]
+            btp_id = item["btp_id"]
+            ayz_id = item["ayz_id"]
+            for campo, val in item["divergencias"].items():
+                writer.writerow([
+                    cpf, btp_id, ayz_id,
+                    campo, val["btp"], val["ayz"], val["status"], val["score"], val["regra"]
+                ])
+        tmp_csv_path = tmp_csv.name
+
+    return FileResponse(tmp_csv_path, media_type="text/csv", filename="comparacao_btp_ayz.csv")

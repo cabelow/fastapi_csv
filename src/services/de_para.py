@@ -8,18 +8,12 @@ Regras de DE–PARA entre BTP e AYZ:
 
 from services.semantic_matcher import similaridade_semantica
 
-# ============================================================
-# Utilitários
-# ============================================================
 
 def normalizar_chave(valor: str) -> str:
     """Normaliza valores para comparação: lower + trim + proteção contra None"""
     return str(valor or "").lower().strip()
 
 
-# ============================================================
-# DE–PARA determinístico (códigos)
-# ============================================================
 
 DE_PARA_DEPARTMENT_CODE = {
     "d010": "st10",
@@ -53,21 +47,30 @@ DE_PARA_UNIT_CODE = {
     "u010": "un10",
 }
 
-# DE–PARA de nomes/cidades (referência + IA)
 DE_PARA_DEPARTMENT_NAME = {
     "tecnologia da informacao": ["ti", "tec info", "tecnologia informação", "tech info", "informática"],
     "recursos humanos": ["rh", "rec humanos", "recursos humanos", "human resources"],
     "financeiro": ["fin", "financeiro", "finance department", "contabilidade"],
-    # cidades
-    "sao paulo": ["filial", "matriz", "sp", "são paulo", "sao paulo - matriz", "s.p."],
-    "rio de janeiro": ["filial", "matriz", "rj", "rio", "rio de janeiro - filial", "r. janeiro"],
+}
+
+DE_PARA_POSITION_NAME = {
+    "tecnologia da informacao": ["ti", "tec info", "tecnologia informação", "tech info", "informática"],
+    "recursos humanos": ["rh", "rec humanos", "recursos humanos", "human resources"],
+    "financeiro": ["fin", "financeiro", "finance department", "contabilidade"],
+}
+
+DE_PARA_UNIT_NAME = {
+    "sao paulo": ["filial", "matriz", "sp", "são paulo", "sao paulo - matriz", "matriz - sao paulo", "matriz sp", "s.p."],
+    "rio de janeiro": ["filial", "matriz", "rj", "rio", "rio de janeiro - filial", "filial - rio de janeiro", "r. janeiro"],
     "belo horizonte": ["filial", "matriz", "bh", "belo horizonte - filial", "b. horizonte"],
     "curitiba": ["filial", "matriz", "cwb", "curitiba - filial", "c.itiba"],
 }
 
-# ============================================================
-# Validação DE–PARA
-# ============================================================
+DE_PARA_EMPLOYMENT_STATUS = {
+    "ATIVO":["1", "A", "ACTIVE","ACTIVE STATUS","EMPLOYED"],
+    "INATIVO":["0", "I", "INACTIVE", "INACTIVE STATUS", "UNEMPLOYED"]
+}
+
 
 def validar_de_para(valor_btp: str, valor_ayz: str, mapa: dict) -> bool:
     """
@@ -114,7 +117,6 @@ def match_semantico_com_referencia(valor_btp: str, valor_ayz: str, mapa: dict, t
     if validar_de_para(v1, v2, mapa):
         return {"status": "match_de_para", "score": 1.0}
 
-    # IA pura contra todos valores do mapa
     candidatos = [normalizar_chave(c) for c in mapa.keys()]
     for vs in mapa.values():
         if isinstance(vs, list):
@@ -144,7 +146,6 @@ def match_com_referencia(valor_btp: str, valor_ayz: str, de_para: dict, threshol
     if v1 == v2:
         return {"status": "match_exato", "score": 1.0}
 
-    # Checa DE–PARA
     for canonico, variacoes in de_para.items():
         if isinstance(variacoes, list):
             if (v1 == canonico and v2 in variacoes) or (v2 == canonico and v1 in variacoes):
@@ -153,7 +154,6 @@ def match_com_referencia(valor_btp: str, valor_ayz: str, de_para: dict, threshol
             if (v1 == canonico and v2 == variacoes) or (v2 == canonico and v1 == variacoes):
                 return {"status": "match_de_para", "score": 1.0}
 
-    # Checa similaridade semântica
     candidatos = list(de_para.keys()) + [v for vs in de_para.values() for v in (vs if isinstance(vs, list) else [vs])]
     melhor_score = max(similaridade_semantica(v1, ref) for ref in candidatos)
 
