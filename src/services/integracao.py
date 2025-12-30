@@ -30,6 +30,7 @@ CAMPOS_DE_PARA_NAME = {
 }
 
 CAMPOS_COMPARACAO = [
+    ("document_number", "cpf"),
     ("full_name", "nome_funcionario"),
     ("unit_code", "cod_unid"),
     ("unit_name", "unidade"),
@@ -44,6 +45,15 @@ CAMPOS_COMPARACAO = [
 
 
 def comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname, threshold_semantico):
+    vazio_btp = pd.isna(valor_btp) or str(valor_btp).strip() == ""
+    vazio_ayz = pd.isna(valor_ayz) or str(valor_ayz).strip() == ""
+    
+    if vazio_btp or vazio_ayz:
+        return {"status": "campo vazio", "score": 0.0, "regra": "validacao", "aceito": False}
+
+    if campo_btp == "monthly_salary" and (float(valor_btp or 0) < 0):
+        return {"status": "dados inválidos", "score": 0.0, "regra": "validacao", "aceito": False}
+    
     valor_btp_norm = normalizar_texto(valor_btp)
     valor_ayz_norm = normalizar_texto(valor_ayz)
 
@@ -60,8 +70,7 @@ def comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname, threshol
         aceito = resultado["status"] != "divergente"
         status = "aprovado DE-PARA com IA" if aceito else "reprovado DE-PARA com IA"
         return {"status": status, "score": resultado["score"], "regra": resultado["status"], "aceito": aceito}
-        
-
+    
     else:
         score = similaridade_semantica(valor_btp_norm, valor_ayz_norm)
         aceito = score >= threshold_fullname
@@ -71,19 +80,29 @@ def comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname, threshol
 
 def processar_funcionario(btp_row, df_ayz, threshold_fullname, threshold_semantico):
     cpf = btp_row["document_number"]
+    
+    cpf_valido = len(str(cpf)) == 11
+    
     ayz_match = df_ayz[df_ayz["cpf"] == cpf]
 
+    is_duplicate = len(ayz_match) > 1
+
     if ayz_match.empty:
-        return {"nao_encontrado": True, "cpf": cpf, "btp_id": btp_row.get("employee_id")}
+        return {"nao_encontrado": True, "cpf": cpf, "btp_id": btp_row.get("employee_id"), "cpf_invalido": not cpf_valido}
 
     ayz_row = ayz_match.iloc[0]
     divergencias = {}
     possui_divergencia_real = False
 
     for campo_btp, campo_ayz in CAMPOS_COMPARACAO:
-        valor_btp = btp_row.get(campo_btp, "")
-        valor_ayz = ayz_row.get(campo_ayz, "")
-        resultado = comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname, threshold_semantico)
+        valor_btp = btp_row.get(campo_btp)
+        valor_ayz = ayz_row.get(campo_ayz)
+
+        if pd.isna(valor_btp) or str(valor_btp).strip() == "" or pd.isna(valor_ayz) or str(valor_ayz).strip() == "":
+            status_erro = "campo_faltando"
+            resultado = {"status": status_erro, "score": 0.0, "regra": "validacao", "aceito": False}
+        else:
+            resultado = comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname, threshold_semantico)
 
         divergencias[campo_btp] = {
             "btp": valor_btp,
@@ -96,17 +115,17 @@ def processar_funcionario(btp_row, df_ayz, threshold_fullname, threshold_semanti
         if not resultado["aceito"]:
             possui_divergencia_real = True
 
-    registro_base = {
-        "cpf": cpf,
-        "btp_id": btp_row.get("employee_id"),
-        "ayz_id": ayz_row.get("cod_func"),
-    }
-
     return {
         "nao_encontrado": False,
-        "registro_base": registro_base,
+        "registro_base": {
+            "cpf": cpf,
+            "btp_id": btp_row.get("employee_id"),
+            "ayz_id": ayz_row.get("cod_func"),
+            "duplicado_no_destino": is_duplicate,
+            "cpf_mal_formado": not cpf_valido
+        },
         "divergencias": divergencias,
-        "possui_divergencia_real": possui_divergencia_real,
+        "possui_divergencia_real": possui_divergencia_real or is_duplicate or not cpf_valido,
     }
 
 
@@ -116,10 +135,15 @@ def comparar_funcionarios(df_btp, df_ayz, threshold_fullname=THRESHOLD_FULLNAME_
         "matches_semanticos": [],
         "divergencias_reais": [],
         "nao_encontrados": [],
+        "alertas_criticos": [],
         "resumo": {},
     }
 
+    cpfs_duplicados_btp = df_btp[df_btp.duplicated('document_number', keep=False)]['document_number'].unique()
+    cpfs_duplicados_ayz = df_ayz[df_ayz.duplicated('cpf', keep=False)]['cpf'].unique()
+
     for _, btp_row in df_btp.iterrows():
+        cpf = btp_row["document_number"]
         info = processar_funcionario(btp_row, df_ayz, threshold_fullname, threshold_semantico)
 
         if info.get("nao_encontrado"):
@@ -127,18 +151,39 @@ def comparar_funcionarios(df_btp, df_ayz, threshold_fullname=THRESHOLD_FULLNAME_
                 "cpf": info["cpf"],
                 "btp_id": info["btp_id"],
             })
+            
+            if cpf in cpfs_duplicados_btp or info.get("cpf_invalido"):
+                resultado["alertas_criticos"].append({
+                    "cpf": cpf,
+                    "btp_id": info["btp_id"],
+                    "motivo": "CPF Duplicado no BTP" if cpf in cpfs_duplicados_btp else "CPF Mal Formado",
+                    "origem": "BTP"
+                })
             continue
 
-        registro_base = info["registro_base"]
+        reg_base = info["registro_base"]
         divergencias = info["divergencias"]
         possui_divergencia_real = info["possui_divergencia_real"]
 
+        if cpf in cpfs_duplicados_btp or cpf in cpfs_duplicados_ayz or reg_base.get("cpf_mal_formado"):
+            motivos = []
+            if cpf in cpfs_duplicados_btp or cpf in cpfs_duplicados_ayz: motivos.append("CPF Duplicado")
+            if reg_base.get("cpf_mal_formado"): motivos.append("CPF Mal Formado")
+            
+            resultado["alertas_criticos"].append({
+                "cpf": cpf,
+                "btp_id": reg_base["btp_id"],
+                "motivo": " e ".join(motivos),
+                "origem": "BTP" if cpf in cpfs_duplicados_btp and cpf not in cpfs_duplicados_ayz else 
+                          "AYZ" if cpf in cpfs_duplicados_ayz and cpf not in cpfs_duplicados_btp else "Ambos"
+            })
+
         if all(v["status"] == "exato" for v in divergencias.values()):
-            resultado["matches_exatos"].append(registro_base)
+            resultado["matches_exatos"].append(reg_base)
         elif possui_divergencia_real:
-            resultado["divergencias_reais"].append({**registro_base, "divergencias": divergencias})
+            resultado["divergencias_reais"].append({**reg_base, "divergencias": divergencias})
         else:
-            resultado["matches_semanticos"].append({**registro_base, "divergencias": divergencias})
+            resultado["matches_semanticos"].append({**reg_base, "divergencias": divergencias})
 
     resultado["resumo"] = {
         "total_btp": len(df_btp),
@@ -147,6 +192,7 @@ def comparar_funcionarios(df_btp, df_ayz, threshold_fullname=THRESHOLD_FULLNAME_
         "matches_semanticos": len(resultado["matches_semanticos"]),
         "divergencias_reais": len(resultado["divergencias_reais"]),
         "nao_encontrados": len(resultado["nao_encontrados"]),
+        "alertas_criticos": len(resultado["alertas_criticos"]),
         "threshold_semantico": threshold_semantico,
         "threshold_fullname": threshold_fullname,
     }

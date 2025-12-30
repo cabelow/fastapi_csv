@@ -1,10 +1,12 @@
 {% macro status_badge(status) %}
 {% if status.startswith('aprovado') or status == 'exato' %}
-<span class="badge ok">{{ status }}</span>
-{% elif status.startswith('reprovado') %}
-<span class="badge erro">{{ status }}</span>
+<span class="status ok">{{ status }}</span>
+{% elif status.startswith('reprovado') or status == 'dados inválidos' %}
+<span class="status erro">{{ status }}</span>
+{% elif status == 'campo vazio' %}
+<span class="status warn">{{ status }}</span>
 {% else %}
-<span class="badge warn">{{ status }}</span>
+<span class="status warn">{{ status }}</span>
 {% endif %}
 {% endmacro %}
 
@@ -14,6 +16,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Comparação BTP x AYZ</title>
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
@@ -24,23 +27,22 @@
             color: #333;
         }
 
-        h1, h2, h3 {
-            color: #333;
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 10px;
         }
 
         h1 {
             text-align: center;
-            margin-bottom: 30px;
         }
 
         h2 {
             margin-top: 40px;
-            margin-bottom: 15px;
             border-bottom: 2px solid #5563DE;
             padding-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         ul {
@@ -48,83 +50,75 @@
             padding: 0;
         }
 
-        ul li {
-            padding: 6px 0;
-            font-size: 14px;
-        }
-
         .ok {
-            color: #4CAF50;
+            color: #2e7d32;
             font-weight: bold;
         }
 
         .erro {
-            color: #f44336;
+            color: #c62828;
             font-weight: bold;
         }
 
         .warn {
-            color: #ff9800;
+            color: #ef6c00;
             font-weight: bold;
         }
 
-        .badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 6px;
+        .status {
+            font-weight: bold;
+            text-transform: uppercase;
             font-size: 12px;
-            font-weight: bold;
-            color: white;
         }
 
-        .badge.ok {
-            background-color: #4CAF50;
+        .status.ok {
+            color: #2e7d32;
         }
 
-        .badge.erro {
-            background-color: #f44336;
+        .status.erro {
+            color: #c62828;
         }
 
-        .badge.warn {
-            background-color: #ff9800;
+        .status.warn {
+            color: #ef6c00;
         }
 
         table {
-            border-collapse: collapse;
             width: 100%;
+            border-collapse: collapse;
             margin-top: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         }
 
-        th, td {
-            padding: 10px;
-            text-align: left;
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
         }
 
         th {
-            background-color: #5563DE;
-            color: #fff;
+            background: #5563DE;
+            color: white;
         }
 
         tr:nth-child(even) {
-            background-color: #f9f9f9;
+            background: #fafafa;
         }
 
-        tr.status-aceito {
-            background-color: #e6ffe6;
+
+        .linha-vazia td {
+            background: #fffaf0;
         }
 
-        tr.status-divergente {
-            background-color: #ffe6e6;
+        .linha-invalida td {
+            background: #fff5f5;
         }
 
         .cpf-header {
-            background-color: #fafafa;
+            margin-top: 25px;
             padding: 10px;
-            font-weight: bold;
             border-left: 4px solid #5563DE;
-            margin-top: 20px;
-            border-radius: 6px;
+            background: #fafafa;
+            font-weight: bold;
         }
 
         a.download-btn {
@@ -151,136 +145,185 @@
             box-shadow: 0 6px 15px rgba(0,0,0,0.2);
         }
 
-        hr {
-            margin: 40px 0;
-            border: 0;
-            border-top: 1px solid #ccc;
+        .cpf-erro {
+            border-left-color: #c62828;
+            color: #c62828;
+        }
+
+        .critical-alert {
+            border: 2px solid #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            background: #fffafa;
+            margin: 20px 0;
+        }
+
+        .cpf-warn {
+            border-left-color: #ef6c00;
+            color: #ef6c00;
+        }
+
+        .cpf-flag {
+            margin-left: 10px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .cpf-flag.erro {
+            color: #c62828;
+        }
+
+        .cpf-flag.warn {
+            color: #ef6c00;
         }
     </style>
 </head>
 
 <body>
+    <div class="container">
 
-    <h1><i class="fa-solid fa-scale-balanced"></i> Integração BTP × AYZ</h1>
+        <h1><i class="fa-solid fa-scale-balanced"></i> Integração BTP × AYZ</h1>
 
-    <h2>📊 Resumo</h2>
-    <ul>
-        <li>Total BTP: {{ resultado.resumo.total_btp }}</li>
-        <li>Total AYZ: {{ resultado.resumo.total_ayz }}</li>
-        <li class="ok">Matches exatos: {{ resultado.resumo.matches_exatos }}</li>
-        <li class="warn">Matches semânticos: {{ resultado.resumo.matches_semanticos }}</li>
-        <li class="erro">Divergências reais: {{ resultado.resumo.divergencias_reais }}</li>
-        <li class="erro">Não encontrados: {{ resultado.resumo.nao_encontrados }}</li>
-    </ul>
+        <h2>📊 Resumo</h2>
+        <ul>
+            <li>Total BTP: {{ resultado.resumo.total_btp }}</li>
+            <li>Total AYZ: {{ resultado.resumo.total_ayz }}</li>
+            <li class="ok">Matches exatos: {{ resultado.resumo.matches_exatos }}</li>
+            <li class="warn">Matches semânticos: {{ resultado.resumo.matches_semanticos }}</li>
+            <li class="erro">Divergências reais: {{ resultado.resumo.divergencias_reais }}</li>
+            <li class="erro">Alertas críticos: {{ resultado.resumo.alertas_criticos }}</li>
+        </ul>
 
-    <h3>Download</h3>
-    <div style="margin-bottom: 20px;">
-        <a class="download-btn pdf" target="_blank" href="/integracao/comparar/download/pdf?ia_name={{ ia_name }}&ia_depara={{ ia_depara }}">
-            📄 Baixar PDF
-        </a>
-        <a class="download-btn csv" target="_blank" href="/integracao/comparar/download/csv?ia_name={{ ia_name }}&ia_depara={{ ia_depara }}">
-            📊 Baixar CSV
-        </a>
-    </div>
+        <h3>Download</h3>
+        <div style="margin-bottom: 20px;">
+            <a class="download-btn pdf" target="_blank"
+                href="/integracao/comparar/download/pdf?ia_name={{ ia_name }}&ia_depara={{ ia_depara }}">
+                📄 Baixar PDF
+            </a>
+            <a class="download-btn csv" target="_blank"
+                href="/integracao/comparar/download/csv?ia_name={{ ia_name }}&ia_depara={{ ia_depara }}">
+                📊 Baixar CSV
+            </a>
+        </div>
 
-    <hr>
 
-    <h2>✅ Matches exatos</h2>
-    <table>
-        <tr>
-            <th>CPF</th>
-            <th>BTP ID</th>
-            <th>AYZ ID</th>
-        </tr>
-        {% for item in resultado.matches_exatos %}
-        <tr>
-            <td>{{ item.cpf }}</td>
-            <td>{{ item.btp_id }}</td>
-            <td>{{ item.ayz_id }}</td>
-        </tr>
+        <h2>✅ Matches exatos</h2>
+        <table>
+            <tr>
+                <th>CPF</th>
+                <th>Origem - AYZ ID</th>
+                <th>Detino - BTP ID</th>
+            </tr>
+            {% for item in resultado.matches_exatos %}
+            <tr>
+                <td>{{ item.cpf }}</td>
+                <td>{{ item.ayz_id }}</td>
+                <td>{{ item.btp_id }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3">Nenhum match exato</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <br /><br /><br /><br />
+
+        <h2>🧠 Matches semânticos (IA)</h2>
+        {% for item in resultado.matches_semanticos %}
+        <div class="cpf-header">
+            CPF {{ item.cpf }} | BTP {{ item.btp_id }} | AYZ {{ item.ayz_id }}
+        </div>
+
+        <table>
+            <tr>
+                <th>Campo</th>
+                <th>Origem - AYZ ID</th>
+                <th>Detino - BTP ID</th>
+                <th>Status</th>
+                <th>Score</th>
+            </tr>
+            {% for campo, valores in item.divergencias.items() %}
+            <tr
+                class="{% if valores.status == 'campo vazio' %}linha-vazia{% elif valores.status == 'dados inválidos' %}linha-invalida{% endif %}">
+                <td>{{ campo }}</td>
+                <td>{{ valores.ayz if valores.ayz else '—' }}</td>
+                <td>{{ valores.btp if valores.btp else '—' }}</td>
+                <td>{{ status_badge(valores.status) }}</td>
+                <td>{{ "%.3f"|format(valores.score) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
         {% else %}
-        <tr>
-            <td colspan="3">Nenhum match exato encontrado</td>
-        </tr>
+        <p>Nenhum match semântico encontrado.</p>
         {% endfor %}
-    </table>
 
-    <h2>🧠 Matches semânticos (IA)</h2>
-    {% for item in resultado.matches_semanticos %}
-    <div class="cpf-header">
-        CPF {{ item.cpf }} | BTP: {{ item.btp_id }} | AYZ: {{ item.ayz_id }}
+        <br /><br /><br /><br />
+
+        <h2>⚠️ Divergências reais</h2>
+        {% for item in resultado.divergencias_reais %}
+
+        <div class="cpf-header
+            {% if item.cpf_duplicado %}
+                cpf-erro
+            {% elif item.cpf_mal_formado %}
+                cpf-warn
+            {% endif %}
+        ">
+            CPF {{ item.cpf }}
+
+            {% if item.cpf_duplicado %}
+            <span class="cpf-flag erro">CPF DUPLICADO</span>
+            {% elif item.cpf_mal_formado %}
+            <span class="cpf-flag warn">CPF MAL FORMADO</span>
+            {% endif %}
+        </div>
+
+        <table>
+            <tr>
+                <th>Campo</th>
+                <th>BTP</th>
+                <th>AYZ</th>
+                <th>Status</th>
+                <th>Score</th>
+            </tr>
+            {% for campo, valores in item.divergencias.items() %}
+            <tr
+                class="{% if valores.status == 'campo vazio' %}linha-vazia{% elif valores.status == 'dados inválidos' %}linha-invalida{% endif %}">
+                <td>{{ campo }}</td>
+                <td>{{ valores.btp if valores.btp else '—' }}</td>
+                <td>{{ valores.ayz if valores.ayz else '—' }}</td>
+                <td>{{ status_badge(valores.status) }}</td>
+                <td>{{ "%.3f"|format(valores.score) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% endfor %}
+
+        <br /><br /><br /><br />
+
+        {% if resultado.alertas_criticos %}
+        <div class="critical-alert">
+            <h2>❌ Alertas Críticos</h2>
+            <table>
+                <tr>
+                    <th>CPF</th>
+                    <th>Motivo</th>
+                    <th>Origem</th>
+                </tr>
+                {% for alerta in resultado.alertas_criticos %}
+                <tr>
+                    <td class="cpf-erro">{{ alerta.cpf }}</td>
+                    <td>{{ status_badge(alerta.motivo) }}</td>
+                    <td>{{ alerta.origem }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+
     </div>
-
-    <table>
-        <tr>
-            <th>Campo</th>
-            <th>BTP</th>
-            <th>AYZ</th>
-            <th>Status</th>
-            <th>Score</th>
-        </tr>
-
-        {% for campo, valores in item.divergencias.items() %}
-        <tr class="{% if valores.status.startswith('aprovado') or valores.status == 'exato' %}status-aceito{% else %}status-divergente{% endif %}">
-            <td>{{ campo }}</td>
-            <td>{{ valores.btp }}</td>
-            <td>{{ valores.ayz }}</td>
-            <td>{{ status_badge(valores.status) }}</td>
-            <td>{{ "%.3f"|format(valores.score) }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    {% else %}
-    <p>Nenhum match semântico encontrado.</p>
-    {% endfor %}
-
-    <h2>⚠️ Divergências reais</h2>
-    {% for item in resultado.divergencias_reais %}
-    <div class="cpf-header">
-        CPF {{ item.cpf }} | BTP: {{ item.btp_id }} | AYZ: {{ item.ayz_id }}
-    </div>
-
-    <table>
-        <tr>
-            <th>Campo</th>
-            <th>BTP</th>
-            <th>AYZ</th>
-            <th>Status</th>
-            <th>Score</th>
-        </tr>
-
-        {% for campo, valores in item.divergencias.items() %}
-        <tr class="{% if valores.status.startswith('aprovado') or valores.status == 'exato' %}status-aceito{% else %}status-divergente{% endif %}">
-            <td>{{ campo }}</td>
-            <td>{{ valores.btp }}</td>
-            <td>{{ valores.ayz }}</td>
-            <td>{{ status_badge(valores.status) }}</td>
-            <td>{{ "%.3f"|format(valores.score) }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    {% else %}
-    <p>Nenhuma divergência encontrada.</p>
-    {% endfor %}
-
-    <h2>❌ Não encontrados no AYZ</h2>
-    <table>
-        <tr>
-            <th>CPF</th>
-            <th>BTP ID</th>
-        </tr>
-        {% for item in resultado.nao_encontrados %}
-        <tr>
-            <td>{{ item.cpf }}</td>
-            <td>{{ item.btp_id }}</td>
-        </tr>
-        {% else %}
-        <tr>
-            <td colspan="2">Nenhum registro ausente</td>
-        </tr>
-        {% endfor %}
-    </table>
-
 </body>
 
 </html>
