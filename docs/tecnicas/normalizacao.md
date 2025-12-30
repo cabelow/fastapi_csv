@@ -155,7 +155,7 @@ Este documento serve como base para:
 
 ---
 
-## 7. Fluxo de Integração
+## 7. Fluxo de Integração ##
 
 ```mermaid
 flowchart LR

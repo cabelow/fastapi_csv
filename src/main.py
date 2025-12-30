@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from api.routes.funcionarios import router as funcionarios_router
 from api.routes.integracao import router as integracao_router
+from api.routes.de_para_rules import router as de_para_rules_router
 from database.session import Base, engine
 
 from models import funcionario
@@ -19,4 +20,10 @@ app.include_router(
     integracao_router,
     prefix="/integracao",
     tags=["Integração"]
+)
+
+app.include_router(
+    de_para_rules_router,
+    prefix="/rules",
+    tags=["Regras De Para"]
 )

@@ -1,33 +1,11 @@
 import pandas as pd
-from services.de_para import (
-    DE_PARA_UNIT_CODE,
-    match_com_referencia,
-    validar_de_para,
-    DE_PARA_DEPARTMENT_CODE,
-    DE_PARA_POSITION_CODE,
-    DE_PARA_DEPARTMENT_NAME,
-    DE_PARA_UNIT_NAME,
-    DE_PARA_POSITION_NAME,
-    DE_PARA_EMPLOYMENT_STATUS
-)
+from services.de_para import match_com_referencia, validar_de_para
 from services.semantic_matcher import similaridade_semantica
 from utils.normalizacao import normalizar_cpf, normalizar_texto
+from services.de_para_loader import carregar_de_para_em_memoria
 
 THRESHOLD_SEMANTICO_DEFAULT = 0.85
 THRESHOLD_FULLNAME_DEFAULT = 0.5
-
-CAMPOS_DE_PARA = {
-    "department_code": DE_PARA_DEPARTMENT_CODE,
-    "position_code": DE_PARA_POSITION_CODE,
-    "unit_code": DE_PARA_UNIT_CODE,
-}
-
-CAMPOS_DE_PARA_NAME = {
-    "unit_name": DE_PARA_UNIT_NAME,
-    "department_name": DE_PARA_DEPARTMENT_NAME,
-    "position_name": DE_PARA_POSITION_NAME,
-    "employment_status": DE_PARA_EMPLOYMENT_STATUS
-}
 
 CAMPOS_COMPARACAO = [
     ("document_number", "cpf"),
@@ -40,8 +18,30 @@ CAMPOS_COMPARACAO = [
     ("position_name", "cargo"),
     ("hire_date", "data_admissao"),
     ("monthly_salary", "salario"),
-    ("employment_status", "status")
 ]
+
+CAMPOS_DE_PARA = {}
+CAMPOS_DE_PARA_NAME = {}
+
+def inicializar_de_para(db):
+    """
+    Carrega os DE-PARA do banco e popula os vetores usados pelo integracao.py
+    """
+    global CAMPOS_DE_PARA, CAMPOS_DE_PARA_NAME
+    de_para = carregar_de_para_em_memoria(db)
+
+    CAMPOS_DE_PARA = {
+        "department_code": de_para.get("department_code", {}),
+        "position_code": de_para.get("position_code", {}),
+        "unit_code": de_para.get("unit_code", {}),
+    }
+
+    CAMPOS_DE_PARA_NAME = {
+        "unit_name": de_para.get("unit_name", {}),
+        "department_name": de_para.get("department_name", {}),
+        "position_name": de_para.get("position_name", {}),
+        "employment_status": de_para.get("employment_status", {}),
+    }
 
 
 def comparar_campo(campo_btp, valor_btp, valor_ayz, threshold_fullname, threshold_semantico):
