@@ -1,5 +1,42 @@
 from services.semantic_matcher import similaridade_semantica
 
+from sqlalchemy.orm import Session
+from models.de_para_rule import DeParaRule 
+
+DE_PARA_UNIT_CODE = {}
+DE_PARA_DEPARTMENT_CODE = {}
+DE_PARA_POSITION_CODE = {}
+DE_PARA_UNIT_NAME = {}
+DE_PARA_DEPARTMENT_NAME = {}
+DE_PARA_POSITION_NAME = {}
+DE_PARA_EMPLOYMENT_STATUS = {}
+
+def carregar_dados_do_banco(db: Session):
+    global DE_PARA_UNIT_CODE, DE_PARA_DEPARTMENT_CODE, DE_PARA_POSITION_CODE
+    global DE_PARA_UNIT_NAME, DE_PARA_DEPARTMENT_NAME, DE_PARA_POSITION_NAME, DE_PARA_EMPLOYMENT_STATUS
+
+    regras = db.query(DeParaRule).all()
+
+    for d in [DE_PARA_UNIT_CODE, DE_PARA_DEPARTMENT_CODE, DE_PARA_POSITION_CODE, 
+              DE_PARA_UNIT_NAME, DE_PARA_DEPARTMENT_NAME, DE_PARA_POSITION_NAME, DE_PARA_EMPLOYMENT_STATUS]:
+        d.clear()
+
+    for r in regras:
+        campo = r.nome_campo.lower().strip()
+        destino = r.valor_destino
+        
+        origens = [o.strip() for o in r.valores_origem.replace(';', ',').split(',')]
+
+        for orig in origens:
+            if campo == "unit_code": DE_PARA_UNIT_CODE[orig] = destino
+            elif campo == "department_code": DE_PARA_DEPARTMENT_CODE[orig] = destino
+            elif campo == "position_code": DE_PARA_POSITION_CODE[orig] = destino
+            elif campo == "unit_name": DE_PARA_UNIT_NAME[orig] = destino
+            elif campo == "department_name": DE_PARA_DEPARTMENT_NAME[orig] = destino
+            elif campo == "position_name": DE_PARA_POSITION_NAME[orig] = destino
+            elif campo == "employment_status": DE_PARA_EMPLOYMENT_STATUS[orig] = destino
+
+    print(f"✅ {len(regras)} regras de-para carregadas do SQLite.")
 
 def normalizar_chave(valor: str) -> str:
     return str(valor or "").lower().strip()
